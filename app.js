@@ -240,6 +240,10 @@ async function processData() {
         populateDropdowns();
         buildGlobalStats();
 
+        // 탭4 캐시 초기화
+        tab4Dirty = true;
+        tab4LastKey = '';
+
         // 업로드된 파일명에서 시험 정보 추출
         updateExamLabel();
 
@@ -390,10 +394,44 @@ function switchTab(evt, tabId) {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     if(evt && evt.target) evt.target.classList.add('active');
     document.getElementById(tabId).classList.add('active');
+
+    // 탭4 진입 시 필요하면 렌더링
+    if(tabId === 'tab4' && tab4Dirty) {
+        renderTab4();
+    }
+    // 탭 전환 시 현재 학생 기준으로 해당 탭만 지연 렌더링
+    if(tabId !== 'tab4') {
+        lazyRenderCurrentTab(tabId);
+    }
+}
+
+/* 탭4 캐싱 플래그 — 데이터 변경 또는 교과군 변경 시 true */
+let tab4Dirty = true;
+/* 탭별 마지막 렌더링된 학번 기록 (학생 전환 시 불필요한 재렌더링 방지) */
+let lastRendered = { tab1: null, tab2: null, tab3: null };
+
+/* 현재 활성 탭만 렌더링 (비활성 탭은 dirty 마킹) */
+function lazyRenderCurrentTab(tabId) {
+    const hakbun = document.getElementById('studentSelect').value;
+    if(!hakbun || !db2026[hakbun]) return;
+    const s26 = db2026[hakbun];
+    let s25 = db2025[hakbun];
+    if(!s25) s25 = Object.values(db2025).find(st => st.name === s26.name);
+
+    if(tabId === 'tab1' && lastRendered.tab1 !== hakbun) {
+        renderTab1(s26);
+        lastRendered.tab1 = hakbun;
+    } else if(tabId === 'tab2' && lastRendered.tab2 !== hakbun) {
+        renderTab2(s25, s26);
+        lastRendered.tab2 = hakbun;
+    } else if(tabId === 'tab3' && lastRendered.tab3 !== hakbun) {
+        renderTab3(s26);
+        lastRendered.tab3 = hakbun;
+    }
 }
 
 /* =========================================================
-   대시보드 갱신
+   대시보드 갱신 — 현재 활성 탭만 렌더링, 나머지는 dirty 마킹
    ========================================================= */
 function updateDashboard() {
     const hakbun = document.getElementById('studentSelect').value;
@@ -405,9 +443,27 @@ function updateDashboard() {
         s25 = Object.values(db2025).find(st => st.name === s26.name);
     }
 
-    renderTab1(s26);
-    renderTab2(s25, s26);
-    renderTab3(s26);
+    // 모든 탭 dirty 초기화
+    lastRendered.tab1 = null;
+    lastRendered.tab2 = null;
+    lastRendered.tab3 = null;
+
+    // 현재 활성 탭만 즉시 렌더링
+    let activeTab = document.querySelector('.tab-content.active');
+    let activeId = activeTab ? activeTab.id : 'tab1';
+
+    if(activeId === 'tab1') {
+        renderTab1(s26);
+        lastRendered.tab1 = hakbun;
+    } else if(activeId === 'tab2') {
+        renderTab2(s25, s26);
+        lastRendered.tab2 = hakbun;
+    } else if(activeId === 'tab3') {
+        renderTab3(s26);
+        lastRendered.tab3 = hakbun;
+    }
+    // tab4는 학생 전환과 무관하므로 렌더링하지 않음
+
     updateNavButtons();
 }
 
@@ -1251,6 +1307,288 @@ function renderTab3(s26) {
 }
 
 /* =========================================================
+   탭4 : 전체성적 일람표 — 교과군 선택 조합 기준 석차 산출
+   ========================================================= */
+
+/* 교과군 칩 토글 */
+function toggleTab4Chip(btn) {
+    btn.classList.toggle('on');
+    let allChip = document.querySelector('.tab4-chip-all');
+    let subjectChips = document.querySelectorAll('#tab4ChipGroup .tab4-chip:not(.tab4-chip-all)');
+    let allOn = Array.from(subjectChips).every(c => c.classList.contains('on'));
+    if(allOn) { allChip.classList.add('on'); } else { allChip.classList.remove('on'); }
+    tab4Dirty = true;
+    tab4LastKey = '';
+    renderTab4();
+}
+
+function toggleTab4All(btn) {
+    let subjectChips = document.querySelectorAll('#tab4ChipGroup .tab4-chip:not(.tab4-chip-all)');
+    if(btn.classList.contains('on')) {
+        btn.classList.remove('on');
+        subjectChips.forEach(c => c.classList.remove('on'));
+    } else {
+        btn.classList.add('on');
+        subjectChips.forEach(c => c.classList.add('on'));
+    }
+    tab4Dirty = true;
+    tab4LastKey = '';
+    renderTab4();
+}
+
+/* 교과군 이름에서 '군' 제거 → 칩 라벨과 매칭 */
+function groupToChipLabel(groupName) {
+    return groupName.replace(/군$/, '');
+}
+
+/* 현재 선택된 교과군에 해당하는 과목 목록 반환 */
+function getTab4SelectedSubjects(db, subjectsList) {
+    let selectedGroups = [];
+    document.querySelectorAll('#tab4ChipGroup .tab4-chip.on:not(.tab4-chip-all)').forEach(c => {
+        selectedGroups.push(c.getAttribute('data-group'));
+    });
+
+    if(selectedGroups.length === 0) return [];
+
+    // '기타' 칩이 선택되면 '기타', '제2외국어군' 등 주요 5교과 외 모든 과목 포함
+    let mainGroups = ['국어군','수학군','영어군','사회군','과학군'];
+    let hasEtc = selectedGroups.includes('기타');
+
+    let result = [];
+    subjectsList.forEach(subj => {
+        let g = getGroup(subj);
+        let label = groupToChipLabel(g);
+        if(selectedGroups.includes(label)) {
+            result.push(subj);
+        } else if(hasEtc && !mainGroups.includes(g)) {
+            result.push(subj);
+        }
+    });
+    return result;
+}
+
+/* 특정 교과군 과목들의 평균등급 계산 */
+function avgGradeForSubjects(student, subjectsList) {
+    let sum = 0, cnt = 0;
+    subjectsList.forEach(subj => {
+        let k = matchSubject(student.scores, subj);
+        if(k && student.scores[k] && student.scores[k].score !== null && student.scores[k].grade) {
+            sum += student.scores[k].grade;
+            cnt++;
+        }
+    });
+    return cnt > 0 ? sum / cnt : null;
+}
+
+/* 특정 교과군 과목들의 평균 백분위 계산 */
+function avgPercentileForSubjects(student, subjectsList) {
+    let sum = 0, cnt = 0;
+    subjectsList.forEach(subj => {
+        let k = matchSubject(student.scores, subj);
+        if(k && student.scores[k] && student.scores[k].score !== null && student.scores[k].pct !== null && !isNaN(student.scores[k].pct)) {
+            sum += (100 - student.scores[k].pct);
+            cnt++;
+        }
+    });
+    return cnt > 0 ? sum / cnt : null;
+}
+
+/* 교과군별 개별 평균등급 계산 (칩 라벨 기준) */
+function perGroupAvgGrade(student, subjectsList, chipLabel) {
+    let mainGroups = ['국어군','수학군','영어군','사회군','과학군'];
+    let groupSubjects = [];
+    if(chipLabel === '기타') {
+        subjectsList.forEach(subj => {
+            if(!mainGroups.includes(getGroup(subj))) groupSubjects.push(subj);
+        });
+    } else {
+        let groupName = chipLabel + '군';
+        subjectsList.forEach(subj => {
+            if(getGroup(subj) === groupName) groupSubjects.push(subj);
+        });
+    }
+    return avgGradeForSubjects(student, groupSubjects);
+}
+
+/* 등급 배지 (탭4 전용, 소수점 1자리) */
+function tab4GradeBadge(grade) {
+    if(grade === null || grade === undefined || isNaN(grade)) return '<span class="tab4-grade-badge tab4-g-none">-</span>';
+    let g = Math.round(grade);
+    if(g < 1) g = 1; if(g > 5) g = 5;
+    return '<span class="tab4-grade-badge tab4-g' + g + '">' + grade.toFixed(1) + '</span>';
+}
+
+/* 전체성적 일람표 렌더링 (최적화: 배열 join + 캐싱) */
+let tab4LastKey = '';
+
+function renderTab4() {
+    let selectedGroups = [];
+    document.querySelectorAll('#tab4ChipGroup .tab4-chip.on:not(.tab4-chip-all)').forEach(c => {
+        selectedGroups.push(c.getAttribute('data-group'));
+    });
+
+    // 캐시 키: 선택된 교과군 조합
+    let cacheKey = selectedGroups.join(',');
+    if(cacheKey === tab4LastKey) { tab4Dirty = false; return; }
+
+    let selInfoEl = document.getElementById('tab4SelInfo');
+    if(selectedGroups.length === 0) {
+        selInfoEl.innerHTML = '⚠️ 교과군을 하나 이상 선택해주세요.';
+        document.querySelector('#tab4PrevTable tbody').innerHTML = '';
+        document.querySelector('#tab4CurrTable tbody').innerHTML = '';
+        document.getElementById('tab4PrevHead').innerHTML = '';
+        document.getElementById('tab4CurrHead').innerHTML = '';
+        tab4LastKey = '';
+        tab4Dirty = false;
+        return;
+    }
+    selInfoEl.innerHTML = 'ℹ️ 선택된 교과군: ' +
+        selectedGroups.map(g => '<span class="tab4-tag">' + g + '</span>').join(' ') +
+        ' 기준 평균등급·백분위로 석차를 산출합니다.';
+
+    // 시험 라벨 업데이트
+    let prevFile = document.getElementById('file2025');
+    let currFile = document.getElementById('file2026');
+    let prevLabelEl = document.getElementById('tab4PrevLabel');
+    let currLabelEl = document.getElementById('tab4CurrLabel');
+    if(prevFile && prevFile.files && prevFile.files[0]) {
+        prevLabelEl.textContent = prevFile.files[0].name.replace(/\.(xlsx|xls|csv)$/i,'').replace(/_/g,' ');
+    }
+    if(currFile && currFile.files && currFile.files[0]) {
+        currLabelEl.textContent = currFile.files[0].name.replace(/\.(xlsx|xls|csv)$/i,'').replace(/_/g,' ');
+    }
+
+    // 테이블 헤더 구성
+    let groupHeaders = selectedGroups.map(g => '<th>' + g + '<br>평균등급</th>').join('');
+    let baseHead = '<th style="width:36px;">석차</th><th style="width:52px;">학번</th><th style="width:56px;">이름</th>';
+    let tailHead = '<th>전체<br>평균등급</th><th>평균<br>백분위</th>';
+    document.getElementById('tab4PrevHead').innerHTML = baseHead + groupHeaders + tailHead;
+    document.getElementById('tab4CurrHead').innerHTML = baseHead + groupHeaders + tailHead;
+
+    let selectedSubjsPrev = getTab4SelectedSubjects(db2025, subjects2025);
+    let selectedSubjsCurr = getTab4SelectedSubjects(db2026, subjects2026);
+
+    // ===== 직전 시험 데이터 =====
+    let prevStudents = [];
+    Object.values(db2025).forEach(st => {
+        let avgG = avgGradeForSubjects(st, selectedSubjsPrev);
+        let avgP = avgPercentileForSubjects(st, selectedSubjsPrev);
+        if(avgG === null) return;
+        let groupGrades = {};
+        selectedGroups.forEach(g => { groupGrades[g] = perGroupAvgGrade(st, subjects2025, g); });
+        prevStudents.push({ hakbun: st.hakbun, name: st.name, avgGrade: avgG, avgPct: avgP, groupGrades: groupGrades });
+    });
+    prevStudents.sort((a,b) => {
+        if(Math.abs(a.avgGrade - b.avgGrade) >= 0.001) return a.avgGrade - b.avgGrade;
+        let pa = a.avgPct !== null ? a.avgPct : -1;
+        let pb = b.avgPct !== null ? b.avgPct : -1;
+        return pb - pa;
+    });
+    prevStudents.forEach((st, i) => {
+        if(i === 0) { st.rank = 1; return; }
+        st.rank = Math.abs(st.avgGrade - prevStudents[i-1].avgGrade) < 0.001 ? prevStudents[i-1].rank : i + 1;
+    });
+
+    // 직전 시험 HTML 배열로 조합
+    let prevRows = [];
+    prevStudents.forEach(st => {
+        let cells = '<td class="tab4-rank-col">' + st.rank + '</td>' +
+            '<td class="tab4-hakbun-col">' + st.hakbun + '</td>' +
+            '<td class="tab4-name-col" title="' + st.name + '">' + st.name + '</td>';
+        selectedGroups.forEach(g => { cells += '<td>' + tab4GradeBadge(st.groupGrades[g]) + '</td>'; });
+        cells += '<td>' + tab4GradeBadge(st.avgGrade) + '</td>';
+        cells += '<td>' + (st.avgPct !== null ? st.avgPct.toFixed(1) : '-') + '</td>';
+        prevRows.push('<tr>' + cells + '</tr>');
+    });
+    let prevTbody = document.querySelector('#tab4PrevTable tbody');
+    prevTbody.innerHTML = prevRows.length > 0 ? prevRows.join('') :
+        '<tr><td colspan="' + (5 + selectedGroups.length) + '" style="color:#999; padding:20px;">직전 시험 데이터가 없습니다.</td></tr>';
+
+    // ===== 이번 시험 데이터 =====
+    let currStudents = [];
+    Object.values(db2026).forEach(st => {
+        let avgG = avgGradeForSubjects(st, selectedSubjsCurr);
+        let avgP = avgPercentileForSubjects(st, selectedSubjsCurr);
+        if(avgG === null) return;
+        let groupGrades = {};
+        selectedGroups.forEach(g => { groupGrades[g] = perGroupAvgGrade(st, subjects2026, g); });
+        currStudents.push({ hakbun: st.hakbun, name: st.name, avgGrade: avgG, avgPct: avgP, groupGrades: groupGrades });
+    });
+    currStudents.sort((a,b) => {
+        if(Math.abs(a.avgGrade - b.avgGrade) >= 0.001) return a.avgGrade - b.avgGrade;
+        let pa = a.avgPct !== null ? a.avgPct : -1;
+        let pb = b.avgPct !== null ? b.avgPct : -1;
+        return pb - pa;
+    });
+    currStudents.forEach((st, i) => {
+        if(i === 0) { st.rank = 1; return; }
+        st.rank = Math.abs(st.avgGrade - currStudents[i-1].avgGrade) < 0.001 ? currStudents[i-1].rank : i + 1;
+    });
+
+    // 직전 데이터 lookup 맵
+    let prevMap = {};
+    prevStudents.forEach(st => { prevMap[st.hakbun] = st; });
+    let prevNameMap = {};
+    prevStudents.forEach(st => { if(!prevNameMap[st.name]) prevNameMap[st.name] = st; });
+
+    // 이번 시험 HTML 배열로 조합
+    let currRows = [];
+    currStudents.forEach(st => {
+        let prev = prevMap[st.hakbun] || prevNameMap[st.name] || null;
+
+        // 석차 변화
+        let rankDeltaHtml = '';
+        if(prev) {
+            let rankDiff = prev.rank - st.rank;
+            if(rankDiff > 0) rankDeltaHtml = ' <span class="tab4-delta tab4-delta-up">▲' + rankDiff + '</span>';
+            else if(rankDiff < 0) rankDeltaHtml = ' <span class="tab4-delta tab4-delta-down">▼' + Math.abs(rankDiff) + '</span>';
+            else rankDeltaHtml = ' <span class="tab4-delta tab4-delta-flat">-</span>';
+        }
+
+        // 교과군별 등급 셀 (변화량 없이 등급만)
+        let groupCells = '';
+        selectedGroups.forEach(g => { groupCells += '<td>' + tab4GradeBadge(st.groupGrades[g]) + '</td>'; });
+
+        // 전체 평균등급 변화
+        let avgGDeltaHtml = '';
+        if(prev) {
+            let diff = prev.avgGrade - st.avgGrade;
+            if(Math.abs(diff) >= 0.05) {
+                avgGDeltaHtml = diff > 0
+                    ? ' <span class="tab4-delta tab4-delta-up">▲' + diff.toFixed(1) + '</span>'
+                    : ' <span class="tab4-delta tab4-delta-down">▼' + Math.abs(diff).toFixed(1) + '</span>';
+            }
+        }
+
+        // 평균 백분위 변화
+        let avgPDeltaHtml = '';
+        if(prev && prev.avgPct !== null && st.avgPct !== null) {
+            let diff = st.avgPct - prev.avgPct;
+            if(Math.abs(diff) >= 0.05) {
+                avgPDeltaHtml = diff > 0
+                    ? ' <span class="tab4-delta tab4-delta-up">▲' + diff.toFixed(1) + '</span>'
+                    : ' <span class="tab4-delta tab4-delta-down">▼' + Math.abs(diff).toFixed(1) + '</span>';
+            }
+        }
+
+        currRows.push('<tr>' +
+            '<td class="tab4-rank-col">' + st.rank + rankDeltaHtml + '</td>' +
+            '<td class="tab4-hakbun-col">' + st.hakbun + '</td>' +
+            '<td class="tab4-name-col" title="' + st.name + '">' + st.name + '</td>' +
+            groupCells +
+            '<td>' + tab4GradeBadge(st.avgGrade) + avgGDeltaHtml + '</td>' +
+            '<td>' + (st.avgPct !== null ? st.avgPct.toFixed(1) : '-') + avgPDeltaHtml + '</td>' +
+            '</tr>');
+    });
+    let currTbody = document.querySelector('#tab4CurrTable tbody');
+    currTbody.innerHTML = currRows.length > 0 ? currRows.join('') :
+        '<tr><td colspan="' + (5 + selectedGroups.length) + '" style="color:#999; padding:20px;">이번 시험 데이터가 없습니다.</td></tr>';
+
+    tab4LastKey = cacheKey;
+    tab4Dirty = false;
+}
+
+/* =========================================================
    상담 카드 출력
    ========================================================= */
 function printCounselCard() {
@@ -1632,6 +1970,10 @@ function saveFullHTML() {
             
             /* [수정] 탭2 막대 차트는 원본 style.css 규격대로 가로 제약 없이 높이만 부모 영역에 맞춤 */
             #barChart { max-height: 240px !important; width: 100% !important; }
+            .main-footer { margin-top: 40px; padding: 20px 0; border-top: 1px solid #EEEDF2; text-align: center; }
+            .main-footer p { margin: 0; font-size: 0.85rem; color: #7E7891; letter-spacing: 0.5px; font-weight: 500; }
+            .main-footer .author { font-weight: 700; color: #5F4A8B; }
+            .main-footer .school { color: #585269; }
         </style>\n`;
     }
 
@@ -1673,13 +2015,15 @@ function saveFullHTML() {
     let fnNames = [
         'readExcelAsync','buildDB','processData','populateDropdowns','filterStudents',
         'navStudent','updateNavButtons','onSearchInput','pickSearch','onSearchKey',
-        'switchTab','updateDashboard','matchSubject','matchSubjectName','getGroup','buildDomains',
+        'switchTab','updateDashboard','lazyRenderCurrentTab','matchSubject','matchSubjectName','getGroup','buildDomains',
         'gradeBadge','pctGauge',
         'achvBadge','toPercentile','avgPercentile','gradeRank',
         'renderTab1','computeFlag','flagBadgeHtml','avgMetric','avgGrade','countSubjects',
         'strengthsWeaknesses','renderTab2','toggleDomainCard','fillTab2InfoCard',
         'buildReliableBody','renderSubjectRow','buildUnreliableBody','renderSplitRow',
         'buildGlobalStats','renderTab3',
+        'toggleTab4Chip','toggleTab4All','groupToChipLabel','getTab4SelectedSubjects',
+        'avgGradeForSubjects','avgPercentileForSubjects','perGroupAvgGrade','tab4GradeBadge','renderTab4',
         'printCounselCard','buildCounselCard',
         'showFileName','saveFullHTML','updateExamLabel'
     ];
@@ -1695,6 +2039,8 @@ function saveFullHTML() {
 
     // 전역 변수 선언 (charts 객체 등)
     let globalVars = 'var charts = {};\nvar currentOptionList = [];\n'
+        + 'var tab4Dirty = true;\nvar tab4LastKey = "";\n'
+        + 'var lastRendered = { tab1: null, tab2: null, tab3: null };\n'
         + 'var DOMAINS = ' + JSON.stringify(DOMAINS) + ';\n'
         + 'var SUBJ_TO_GROUP = ' + JSON.stringify(SUBJ_TO_GROUP) + ';\n';
 
@@ -1730,6 +2076,10 @@ document.addEventListener('click', function(e) {
     <div class="dashboard-container">
         ${headerHTML}
         ${wsHTML}
+
+        <footer class="main-footer no-print">
+            <p>Made by <span class="author">IRONMIN</span> (<span class="school">Jeonju high school</span>)</p>
+        </footer>
     </div>
     <script>
     ${dbJSON}

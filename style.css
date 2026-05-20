@@ -2606,3 +2606,233 @@ header h1 {
 .name-search-wrapper #studentNameSearch {
     padding-right: 30px;
 }
+
+/* ========================================
+   Main Footer Design
+   ======================================== */
+.main-footer {
+    margin-top: 40px;
+    padding: 20px 0;
+    border-top: 1px solid var(--neutral-200, #EEEDF2);
+    text-align: center;
+}
+.main-footer p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--neutral-500, #7E7891);
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+.main-footer .author {
+    font-weight: 700;
+    color: var(--primary, #5F4A8B);
+}
+.main-footer .school {
+    color: var(--neutral-600, #585269);
+}
+
+/* ===== 탭4 전체성적 일람표 ===== */
+.tab4-ctrl-panel {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+    padding: 14px 18px;
+    background: var(--neutral-100, #F8F7FA);
+    border-radius: var(--radius-sm, 10px);
+}
+.tab4-ctrl-icon {
+    font-size: 1.1rem;
+}
+.tab4-ctrl-label {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text-secondary, #585269);
+    white-space: nowrap;
+}
+.tab4-chip-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.tab4-chip {
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1.5px solid var(--neutral-300, #DDDBE5);
+    color: var(--text-secondary, #585269);
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+.tab4-chip:hover {
+    border-color: var(--primary, #5F4A8B);
+    color: var(--primary, #5F4A8B);
+}
+.tab4-chip.on {
+    background: var(--primary, #5F4A8B);
+    color: #fff;
+    border-color: var(--primary, #5F4A8B);
+}
+.tab4-chip-all.on {
+    background: var(--primary-dark, #483670);
+    border-color: var(--primary-dark, #483670);
+}
+.tab4-sel-info {
+    font-size: 0.84rem;
+    color: var(--text-secondary, #585269);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.tab4-sel-info .tab4-tag {
+    display: inline-block;
+    background: rgba(95,74,139,0.1);
+    color: var(--primary, #5F4A8B);
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.tab4-split-tables {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+.tab4-half-panel {
+    border: 1px solid var(--neutral-200, #EEEDF2);
+    border-radius: var(--radius-sm, 10px);
+    overflow: hidden;
+}
+.tab4-panel-hdr {
+    padding: 10px 16px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.tab4-prev {
+    background: var(--primary-bg, rgba(95,74,139,0.08));
+    color: var(--primary-dark, #483670);
+}
+.tab4-curr {
+    background: var(--success-bg, rgba(21,128,61,0.1));
+    color: var(--success, #15803D);
+}
+.tab4-exam-badge {
+    font-size: 0.75rem;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-weight: 600;
+    background: rgba(95,74,139,0.12);
+    color: var(--primary, #5F4A8B);
+}
+.tab4-curr-badge {
+    background: rgba(21,128,61,0.12);
+    color: var(--success, #15803D);
+}
+.tab4-table-scroll {
+    overflow-x: auto;
+    max-height: 620px;
+    overflow-y: auto;
+}
+.tab4-roster {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+.tab4-roster th {
+    padding: 8px 6px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--text-secondary, #585269);
+    border-bottom: 2px solid var(--neutral-300, #DDDBE5);
+    background: var(--neutral-100, #F8F7FA);
+    text-align: center;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+.tab4-roster td {
+    padding: 7px 6px;
+    text-align: center;
+    border-bottom: 1px solid var(--neutral-200, #EEEDF2);
+    color: var(--text-primary, #1A1626);
+    white-space: nowrap;
+}
+.tab4-roster tr:hover td {
+    background: var(--primary-bg, rgba(95,74,139,0.04));
+}
+.tab4-roster .tab4-rank-col {
+    font-weight: 700;
+    color: var(--primary-dark, #483670);
+}
+.tab4-roster .tab4-name-col {
+    text-align: center;
+    font-weight: 600;
+    max-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.tab4-roster .tab4-hakbun-col {
+    color: var(--text-muted, #7E7891);
+    font-size: 0.78rem;
+}
+.tab4-delta {
+    font-size: 0.74rem;
+    font-weight: 700;
+    margin-left: 3px;
+}
+.tab4-delta-up { color: var(--success, #15803D); }
+.tab4-delta-down { color: var(--warning, #D97706); }
+.tab4-delta-flat { color: var(--text-muted, #7E7891); }
+.tab4-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    font-size: 0.82rem;
+    color: var(--text-secondary, #585269);
+}
+.tab4-note-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 10px 16px;
+    background: var(--neutral-100, #F8F7FA);
+    border-radius: var(--radius-sm, 10px);
+    font-size: 0.82rem;
+    color: var(--text-secondary, #585269);
+    line-height: 1.55;
+}
+.tab4-grade-badge {
+    display: inline-block;
+    min-width: 22px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-weight: 700;
+    color: #fff;
+    font-size: 0.72rem;
+    text-align: center;
+}
+.tab4-g1 { background: var(--grade-1, #15803D); }
+.tab4-g2 { background: var(--grade-2, #5F4A8B); }
+.tab4-g3 { background: var(--grade-3, #0369A1); }
+.tab4-g4 { background: var(--grade-4, #D97706); }
+.tab4-g5 { background: #DC2626; }
+.tab4-g-none { background: #9CA3AF; }
+
+@media (max-width: 820px) {
+    .tab4-split-tables {
+        grid-template-columns: 1fr;
+    }
+}

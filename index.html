@@ -353,6 +353,7 @@
                 <button class="tab-btn active" onclick="switchTab(event,'tab1')">개인별 성적 종합 조회</button>
                 <button class="tab-btn" onclick="switchTab(event,'tab2')">직전 대비 향상/하락 분석</button>
                 <button class="tab-btn" onclick="switchTab(event,'tab3')">과목별 분포 및 통계</button>
+                <button class="tab-btn" onclick="switchTab(event,'tab4')">전체 성적 일람표</button>
             </div>
 
             <div class="controls">
@@ -525,6 +526,58 @@
                 </table>
             </div>
 
+            <!-- 탭4: 전체 성적 일람표 -->
+            <div id="tab4" class="tab-content">
+                <div class="tab4-ctrl-panel" id="tab4CtrlPanel">
+                    <span class="tab4-ctrl-icon">📊</span>
+                    <span class="tab4-ctrl-label">교과군 선택:</span>
+                    <div class="tab4-chip-group" id="tab4ChipGroup">
+                        <button class="tab4-chip on" data-group="국어" onclick="toggleTab4Chip(this)">국어</button>
+                        <button class="tab4-chip on" data-group="수학" onclick="toggleTab4Chip(this)">수학</button>
+                        <button class="tab4-chip on" data-group="영어" onclick="toggleTab4Chip(this)">영어</button>
+                        <button class="tab4-chip" data-group="사회" onclick="toggleTab4Chip(this)">사회</button>
+                        <button class="tab4-chip" data-group="과학" onclick="toggleTab4Chip(this)">과학</button>
+                        <button class="tab4-chip" data-group="기타" onclick="toggleTab4Chip(this)">기타</button>
+                        <button class="tab4-chip tab4-chip-all on" data-group="전체" onclick="toggleTab4All(this)">전체</button>
+                    </div>
+                </div>
+                <div class="tab4-sel-info" id="tab4SelInfo"></div>
+                <div class="tab4-split-tables">
+                    <div class="tab4-half-panel">
+                        <div class="tab4-panel-hdr tab4-prev">
+                            <span>📘 직전 시험</span>
+                            <span class="tab4-exam-badge" id="tab4PrevLabel">직전 시험</span>
+                        </div>
+                        <div class="tab4-table-scroll">
+                            <table class="tab4-roster" id="tab4PrevTable">
+                                <thead><tr id="tab4PrevHead"></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab4-half-panel">
+                        <div class="tab4-panel-hdr tab4-curr">
+                            <span>📗 이번 시험</span>
+                            <span class="tab4-exam-badge tab4-curr-badge" id="tab4CurrLabel">이번 시험</span>
+                        </div>
+                        <div class="tab4-table-scroll">
+                            <table class="tab4-roster" id="tab4CurrTable">
+                                <thead><tr id="tab4CurrHead"></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab4-legend">
+                    <span><span style="color:#15803D; font-weight:bold;">▲</span> 직전 대비 상승</span>
+                    <span><span style="color:#D97706; font-weight:bold;">▼</span> 직전 대비 하락</span>
+                    <span><span style="color:#888;">-</span> 변동 없음</span>
+                </div>
+                <div class="tab4-note-bar">
+                    💡 교과군 조합(국어·수학·영어·사회·과학)을 토글하면 해당 과목군의 평균등급·백분위 기준으로 석차가 재산출됩니다.
+                </div>
+            </div>
+
             <!-- 출력 전용 상담 카드 -->
             <div id="counselCard" class="tab-content">
                 <!-- 헤더: 제목 + 시험 정보 + 플래그 -->
@@ -601,7 +654,9 @@
                 </div>
                 </div>
             </div>
-        </div>
+        </div><footer class="main-footer no-print">
+    <p>Made by <span class="author">IRONMIN</span> (<span class="school">Jeonju high school</span>)</p>
+</footer>
     </div>
     <script src="app.js"></script>
 </body>
