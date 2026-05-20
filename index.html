@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>고등학교 내신 성적 통합 분석 대시보드</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <style>
+        body { font-family: 'Pretendard', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background: var(--bg-body, #f4f7f6); margin: 0; padding: 20px; color: var(--text-primary, #333); }
+        .dashboard-container { max-width: 1200px; margin: 0 auto; }
+
+        /* === 상단 헤더 === */
+        .main-header { background: linear-gradient(135deg, #483670 0%, #5F4A8B 50%, #7F68AA 100%); padding: 32px 24px 28px; text-align: center; border-radius: 12px 12px 0 0; position: relative; }
+        .main-header h1 { font-size: 1.45rem; font-weight: 700; color: #fff; margin: 0; letter-spacing: -0.3px; }
+        .main-header p { font-size: 0.85rem; color: rgba(255,255,255,0.7); margin: 10px 0 0; }
+        .main-header-sparkle { position: absolute; top: 14px; right: 18px; font-size: 18px; color: rgba(255,255,255,0.4); }
+        .header-badge { display: inline-block; margin-top: 8px; background: rgba(255,255,255,0.18); padding: 3px 14px; border-radius: 20px; font-size: 0.78rem; color: rgba(255,255,255,0.9); font-weight: 700; }
+
+        /* === 업로드 섹션 === */
+        .upload-section { background: white; border: 1px solid #eee; border-top: none; border-radius: 0 0 12px 12px; padding: 28px 32px 32px; margin-bottom: 20px; }
+        .info-box { background: var(--primary-bg, #f0eef5); border-radius: 10px; padding: 18px 22px; margin-bottom: 18px; }
+        .info-box h4 { margin: 0 0 10px; font-size: 0.95rem; color: var(--primary-dark, #483670); font-weight: 700; }
+        .info-box p { margin: 0; font-size: 0.88rem; color: var(--text-secondary, #555); line-height: 1.65; }
+        .security-box { background: #fafafa; }
+        .security-box ul { margin: 0; padding-left: 20px; font-size: 0.88rem; color: var(--text-secondary, #555); line-height: 1.85; text-align: left; }
+        .security-note { font-size: 0.82rem; color: var(--text-muted, #999); margin-top: 10px !important; text-align: left; }
+        .file-guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0; }
+        .file-guide-item { background: white; border: 1px solid #e5e5e5; border-radius: 8px; padding: 12px 14px; }
+        .file-guide-item .fg-label { display: block; font-size: 0.72rem; color: var(--text-muted, #999); margin-bottom: 3px; }
+        .file-guide-item .fg-title { display: block; font-size: 0.9rem; font-weight: 700; color: var(--text-primary, #333); }
+        .file-guide-item .fg-example { display: block; font-size: 0.78rem; color: var(--text-secondary, #666); margin-top: 4px; }
+        .fg-note { font-size: 0.82rem !important; margin-top: 10px !important; }
+
+        /* 파일 업로드 슬롯 */
+        .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 22px; }
+        .upload-slot { background: white; border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px 18px; }
+        .upload-label { display: block; font-size: 0.92rem; font-weight: 700; color: var(--primary, #5F4A8B); margin-bottom: 10px; text-align: center; }
+        .upload-drop { background: #fafafa; border: 2px dashed #ccc; border-radius: 10px; padding: 32px 20px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+        .upload-drop:hover { border-color: var(--primary, #5F4A8B); background: var(--primary-bg, #f0eef5); }
+        .upload-drop-icon { font-size: 2rem; color: var(--text-muted, #bbb); margin-bottom: 6px; }
+        .upload-drop-text { font-size: 0.9rem; font-weight: 500; color: var(--text-primary, #333); margin: 0 0 4px; }
+        .upload-drop-hint { font-size: 0.8rem; color: var(--text-muted, #999); margin: 0; }
+        .upload-drop input[type="file"] { display: none; }
+        .upload-file-name { font-size: 0.82rem; color: var(--primary, #5F4A8B); font-weight: 500; margin-top: 8px; word-break: break-all; }
+
+        /* 버튼 영역 */
+        .upload-actions { display: flex; gap: 12px; justify-content: center; }
+        .btn-analyze { background: var(--primary, #5F4A8B); color: white; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 0.95rem; }
+        .btn-analyze:hover { background: var(--primary-dark, #483670); }
+        .btn-save-html { background: #555; color: white; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 0.95rem; }
+        .btn-save-html:hover:not(:disabled) { background: #333; }
+        .btn-save-html:disabled { background: #aaa; cursor: not-allowed; }
+        #workspace { display: none; }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; background: white; padding: 12px 16px; border-radius: 12px; box-shadow: var(--shadow-sm, 0 2px 8px rgba(0,0,0,0.05)); align-items: center; flex-wrap: wrap; }
+        .ctrl-group { display: flex; align-items: center; gap: 6px; }
+        .ctrl-icon { font-size: 1rem; }
+        .ctrl-label { font-size: 0.85rem; font-weight: 700; color: var(--text-secondary, #555); white-space: nowrap; }
+        .ctrl-student { flex: 1; min-width: 300px; }
+        .ctrl-student select { max-width: 220px; flex-shrink: 0; }
+        .ctrl-student .search-wrap { flex: 1; }
+        .ctrl-right { margin-left: auto; gap: 8px; }
+        .controls select { padding: 8px 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 0.9rem; font-family: inherit; }
+        .nav-btn { background: var(--primary-bg, #f0eef5); color: var(--primary, #5F4A8B); border: 1px solid var(--border-medium, #ddd); width: 36px; height: 36px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.15s; }
+        .nav-btn:hover:not(:disabled) { background: var(--primary, #5F4A8B); color: white; }
+        .nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .search-wrap { position: relative; flex: 1; min-width: 160px; }
+        #studentSearch { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 0.9rem; box-sizing: border-box; font-family: inherit; }
+        .search-results { position: absolute; top: 42px; left: 0; right: 0; background: white; border: 1px solid #ccc; border-radius: 8px; box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.15)); max-height: 260px; overflow-y: auto; z-index: 50; display: none; }
+        .search-results div { padding: 9px 12px; cursor: pointer; font-size: 0.88rem; border-bottom: 1px solid #f0f0f0; }
+        .search-results div:hover, .search-results div.highlight { background: var(--primary-bg, #f0eef5); }
+        .btn-print-ghost { background: transparent; color: var(--primary, #5F4A8B); border: 1.5px solid var(--primary, #5F4A8B); padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.88rem; font-family: inherit; white-space: nowrap; transition: all 0.2s; }
+        .btn-print-ghost:hover { background: var(--primary, #5F4A8B); color: white; }
+        .exam-label { display: inline-flex; align-items: center; gap: 5px; background: var(--primary-bg, #f0eef5); color: var(--primary-dark, #483670); padding: 6px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; white-space: nowrap; }
+        .controls-sub { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+        .tabs { display: flex; gap: 0; margin-bottom: 0; border-bottom: 2px solid #ddd; }
+        .tab-btn { padding: 14px 24px; background: none; border: none; font-size: 1.05rem; font-weight: 700; color: #777; cursor: pointer; border-bottom: 3px solid transparent; font-family: inherit; }
+        .tab-btn.active { color: var(--primary, #5F4A8B); border-bottom: 3px solid var(--primary, #5F4A8B); }
+        .tab-content { display: none; background: white; padding: 18px 20px; border-radius: 12px; box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.1)); min-height: 500px; }
+        .tab-content.active { display: block; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.95rem; }
+        th, td { border: 1px solid #e0e0e0; padding: 12px; text-align: center; }
+        th { background-color: var(--primary-bg, #f0eef5); color: var(--primary-dark, #333); font-weight: bold; }
+        tr:nth-child(even) { background-color: #fafafa; }
+        .delta-up { color: var(--success, #15803D); font-weight: bold; }
+        .delta-up::before { content: '▲ '; }
+        .delta-down { color: var(--warning, #D97706); font-weight: bold; }
+        .delta-down::before { content: '▼ '; }
+        .delta-flat { color: #888; }
+        .delta-flat::before { content: '- '; }
+        .grid-2 { display: grid; grid-template-columns: 2fr 3fr; gap: 10px; align-items: start; }
+        .chart-container { background: #fafafa; border-radius: 10px; padding: 10px; border: 1px solid #eee; }
+        .narrative-box { background: var(--info-bg, #f0f7ff); border-left: 4px solid var(--info, #2563EB); padding: 15px; border-radius: 0 8px 8px 0; margin-top: 20px; line-height: 1.6; }
+        .loader { text-align: center; padding: 20px; display: none; font-weight: bold; color: var(--primary); }
+
+        /* 등급 색상 배지 */
+        .grade-badge { display: inline-block; min-width: 32px; padding: 1px 5px; border-radius: 4px; font-weight: bold; color: #fff; font-size: 0.75rem; }
+        .grade-1 { background: #15803D; }
+        .grade-2 { background: #4D7C0F; }
+        .grade-3 { background: #D97706; }
+        .grade-4 { background: #EA580C; }
+        .grade-5 { background: #DC2626; }
+        .grade-none { background: #9CA3AF; }
+
+        /* 석차백분율 게이지 막대 */
+        .pct-gauge { display: flex; align-items: center; gap: 8px; }
+        .pct-gauge .bar-track { flex: 1; background: #ececf2; border-radius: 5px; height: 12px; overflow: hidden; min-width: 70px; }
+        .pct-gauge .bar-fill { height: 12px; border-radius: 5px; }
+        .pct-gauge .bar-label { font-size: 0.85rem; min-width: 44px; text-align: right; color: var(--text-secondary, #555); }
+
+        /* 주의 학생 플래그 배지 */
+        .flag-badge { display: inline-block; background: var(--warning-bg, #fff3e0); color: var(--warning, #D97706); border: 1px solid var(--warning, #D97706); padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; margin-left: 10px; vertical-align: middle; }
+        .flag-badge.high { background: #fde8e8; color: #DC2626; border-color: #DC2626; }
+        .flag-badge.ok { background: var(--success-bg, #e8f5e9); color: var(--success, #15803D); border-color: var(--success, #15803D); }
+        .flag-reasons { margin-top: 12px; }
+        .flag-reasons .reason-chip { display: inline-block; background: var(--warning-bg, #fff3e0); color: var(--warning, #D97706); padding: 5px 12px; border-radius: 14px; font-size: 0.85rem; margin: 3px 4px 3px 0; }
+
+        /* 강점/보완 과목 카드 */
+        .highlight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+        .hl-col h4 { margin: 0 0 8px; font-size: 0.95rem; }
+        .hl-col .hl-item { display: flex; justify-content: space-between; padding: 7px 11px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 5px; }
+        .hl-strong { background: var(--success-bg, #e8f5e9); color: #166534; }
+        .hl-weak { background: var(--warning-bg, #fff3e0); color: #9A3412; }
+        .hl-empty { color: #999; font-size: 0.88rem; padding: 7px 11px; }
+
+        /* 상담 카드 (출력용) */
+        #counselCard { display: none; }
+        .counsel-meta { display: flex; gap: 14px; flex-wrap: wrap; margin: 10px 0 18px; }
+        .meta-box { background: var(--primary-bg, #f0eef5); border-radius: 10px; padding: 10px 16px; }
+        .meta-box .m-label { font-size: 0.8rem; color: var(--text-secondary, #666); }
+        .meta-box .m-value { font-size: 1.3rem; font-weight: bold; color: var(--primary-dark, #333); }
+        .memo-area { border: 1.5px dashed #bbb; border-radius: 8px; min-height: 90px; margin-top: 8px; }
+
+        /* 상담 카드 인쇄용 스타일 */
+        .cc-section-title { font-size: 0.92rem; color: var(--text-secondary, #555); margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #eee; }
+        .cc-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 12px; }
+        .cc-table th { padding: 5px 4px; border-bottom: 1px solid #ccc; font-weight: bold; font-size: 0.75rem; color: var(--text-secondary, #666); text-align: center; }
+        .cc-table td { padding: 5px 4px; border-bottom: 1px solid #eee; text-align: center; }
+        .cc-table td:first-child { text-align: center; font-weight: bold; }
+        .cc-growth-table { }
+        .cc-growth-table td:first-child { text-align: center; color: var(--text-primary, #333); }
+        .cc-prev-bg { background: #f5f5f5; }
+        .cc-delta-bg { background: #fef8ee; }
+        .cc-grow-h1 th { font-size: 0.78rem; padding: 6px 3px; }
+        .cc-grow-h2 th { font-size: 0.7rem; padding: 3px; }
+        .cc-up { color: #15803D; font-weight: bold; }
+        .cc-down { color: #D97706; font-weight: bold; }
+        .cc-flat { color: #888; }
+        .cc-dist-row { margin-bottom: 8px; }
+        .cc-dist-head { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 3px; }
+        .cc-dist-strip { position: relative; height: 20px; background: linear-gradient(90deg,#fde8e8 0%,#fff7e0 50%,#e7f5ec 100%); border-radius: 5px; border: 1px solid #eee; }
+        .cc-dist-avg { position: absolute; top: 0; bottom: 0; width: 1.5px; background: #185FA5; }
+        .cc-dist-me { position: absolute; top: 2px; width: 15px; height: 15px; border-radius: 50%; background: var(--primary, #5F4A8B); border: 2px solid #fff; box-shadow: 0 0 0 1.5px var(--primary, #5F4A8B); transform: translateX(-50%); }
+        .cc-dist-scale { display: flex; justify-content: space-between; font-size: 0.65rem; color: #999; margin-top: 1px; }
+
+        /* 학급 내 분포 점 그래프 */
+        .dist-row { margin: 14px 0; }
+        .dist-head { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 4px; }
+        .dist-head .d-subj { font-weight: bold; color: var(--primary-dark, #333); }
+        .dist-head .d-info { color: var(--text-secondary, #555); }
+        .dist-strip { position: relative; height: 32px; background: linear-gradient(90deg,#fde8e8 0%,#fff7e0 50%,#e7f5ec 100%); border-radius: 6px; border: 1px solid #eee; }
+        .dist-dot { position: absolute; top: 11px; width: 10px; height: 10px; border-radius: 50%; background: #185FA5; opacity: 0.22; transform: translateX(-50%); }
+        .dist-dot.me { width: 18px; height: 18px; top: 7px; background: var(--primary, #5F4A8B); opacity: 1; border: 2px solid #fff; box-shadow: 0 0 0 2px var(--primary, #5F4A8B); z-index: 5; }
+        .dist-avg { position: absolute; top: 0; bottom: 0; width: 2px; background: #185FA5; z-index: 3; }
+        .dist-scale { display: flex; justify-content: space-between; font-size: 0.75rem; color: #999; margin-top: 2px; }
+        .dist-legend { font-size: 0.85rem; color: var(--text-secondary,#555); margin: 6px 0 14px; }
+        .dist-legend span { margin-right: 16px; }
+
+        /* 학생 헤더 카드 (탭1) */
+        .student-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #fff; border: 1px solid var(--border-light, #eee); border-radius: 10px; padding: 12px 16px; flex-wrap: wrap; }
+        .student-header .sh-left h3 { margin: 0; font-size: 1.35rem; color: var(--text-primary, #333); }
+        .student-header .sh-left p { margin: 3px 0 0; font-size: 0.9rem; color: var(--text-muted, #888); }
+        .student-header .sh-right { display: flex; gap: 10px; align-items: center; }
+        .sh-stat { background: var(--primary-bg, #f0eef5); border-radius: 8px; padding: 8px 16px; text-align: center; }
+        .sh-stat .sh-label { display: block; font-size: 0.78rem; color: var(--text-secondary, #666); }
+        .sh-stat .sh-value { display: block; font-size: 1.3rem; font-weight: bold; color: var(--primary-dark, #333); }
+
+        /* 학생 정보 패널 (탭1) */
+        .info-card { background: #fff; border: 1px solid var(--border-light, #eee); border-radius: 10px; padding: 12px 14px; }
+        .info-card h4 { margin: 0 0 10px; font-size: 1rem; }
+        .info-table { width: 100%; margin: 0; border-collapse: collapse; }
+        .info-table td { border: none; border-bottom: 1px solid #eee; padding: 9px 2px; font-size: 0.92rem; }
+        .info-table tr:last-child td { border-bottom: none; }
+        .info-table tr:nth-child(even) { background: none; }
+        .info-table .info-key { text-align: left; color: var(--text-secondary, #666); }
+        .info-table .info-val { text-align: right; font-weight: bold; }
+
+        /* 성취도 배지 */
+        .achv-badge { display: inline-block; min-width: 18px; padding: 1px 6px; border-radius: 4px; font-weight: bold; color: #fff; font-size: 0.75rem; }
+        .achv-A { background: #15803D; } .achv-B { background: #4D7C0F; }
+        .achv-C { background: #D97706; } .achv-D { background: #EA580C; }
+        .achv-E { background: #DC2626; } .achv-none { background: #9CA3AF; }
+        .achv-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: 0.82rem; color: var(--text-secondary, #666); }
+        .achv-legend b { display: inline-block; min-width: 22px; text-align: center; color: #fff; border-radius: 4px; padding: 1px 6px; margin-right: 4px; }
+
+        /* ===== 탭2 교과군 아코디언 ===== */
+        .domain-accordion { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+        .domain-card { background: #fff; border: 1px solid var(--border-light, #eee); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.04)); transition: box-shadow 0.15s; }
+        .domain-card:hover { box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.08)); }
+        .domain-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; cursor: pointer; user-select: none; transition: background 0.15s; flex-wrap: wrap; }
+        .domain-header:hover { background: var(--primary-bg, #f0eef5); }
+        .domain-toggle { font-size: 0.85rem; color: var(--text-muted, #999); width: 14px; transition: transform 0.2s; display: inline-block; }
+        .domain-card.collapsed .domain-toggle { transform: rotate(-90deg); }
+        .domain-name { font-weight: bold; font-size: 1.05rem; color: var(--text-primary, #333); flex-shrink: 0; }
+        .domain-name .ref-tag { font-size: 0.72rem; color: var(--warning, #D97706); background: var(--warning-bg, #fff3e0); padding: 2px 8px; border-radius: 8px; margin-left: 6px; font-weight: normal; vertical-align: middle; }
+        .domain-summary { margin-left: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .domain-summary .pct-change { color: var(--text-secondary, #555); font-size: 0.93rem; }
+        .domain-summary .pct-change b { color: var(--text-primary, #333); font-size: 1rem; }
+        .domain-badge { display: inline-block; padding: 5px 13px; border-radius: 14px; font-weight: bold; font-size: 0.88rem; white-space: nowrap; }
+        .domain-badge.up { background: var(--success-bg, #e8f5e9); color: var(--success, #15803D); }
+        .domain-badge.down { background: var(--warning-bg, #fff3e0); color: var(--warning, #D97706); }
+        .domain-badge.flat { background: #f0f0f0; color: #666; }
+        .domain-body { padding: 4px 18px 18px; border-top: 1px solid var(--border-light, #eee); }
+        .domain-card.collapsed .domain-body { display: none; }
+
+        /* 1:1 매칭 가능한 군 (국·수·영) — 표 형식 */
+        .subj-row { display: grid; grid-template-columns: 1.5fr 1.4fr 1.7fr 1.4fr; gap: 12px; align-items: center; padding: 11px 6px; border-bottom: 1px solid #f3f3f3; font-size: 0.92rem; }
+        .subj-row:last-child { border-bottom: none; }
+        .subj-row.head { font-weight: bold; color: var(--text-secondary, #666); font-size: 0.8rem; border-bottom: 2px solid var(--border-light, #ddd); padding-top: 10px; padding-bottom: 10px; }
+        .subj-row .subj-name { font-weight: 600; color: var(--text-primary, #333); }
+        .subj-row .subj-name .arrow { color: var(--text-muted, #999); margin: 0 5px; font-weight: normal; }
+        .subj-row .metric-main { font-weight: bold; color: var(--text-primary, #333); }
+        .subj-row .metric-sub { font-size: 0.86rem; color: var(--text-secondary, #666); }
+        .subj-row .col-label { display: none; }       /* 데스크탑에서는 중복 라벨 숨김 */
+        .subj-row .rank-line { display: block; line-height: 1.45; }
+        .subj-row .grade-line { display: block; line-height: 1.45; margin-top: 2px; }
+        .delta-inline { display: inline-block; margin-left: 6px; font-size: 0.84rem; font-weight: bold; white-space: nowrap; }
+        .delta-inline.up { color: var(--success, #15803D); }
+        .delta-inline.down { color: var(--warning, #D97706); }
+        .delta-inline.flat { color: #888; font-weight: normal; }
+
+        /* 1:1 불가 군 (사·과) — 좌우 분리 패널, 내부 미니 표 */
+        .unmatched-note { background: var(--info-bg, #f0f7ff); border-left: 3px solid var(--info, #2563EB); padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: 0.88rem; color: var(--text-secondary, #555); margin: 10px 0 14px; line-height: 1.55; }
+        .unmatched-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .unmatched-col { background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 12px 14px; }
+        .unmatched-col h5 { margin: 0 0 8px; font-size: 0.85rem; color: var(--primary-dark, #483670); font-weight: 700; }
+        .split-row { display: grid; grid-template-columns: 1.4fr 0.8fr 1.5fr 0.8fr; gap: 7px; padding: 7px 2px; border-bottom: 1px solid #f0f0f0; font-size: 0.88rem; align-items: center; }
+        .split-row:last-child { border-bottom: none; }
+        .split-row.head { font-weight: bold; color: var(--text-secondary, #666); font-size: 0.72rem; border-bottom: 2px solid var(--border-light, #ddd); padding-top: 6px; padding-bottom: 8px; }
+        .split-row .s-name { font-weight: 600; color: var(--text-primary, #333); }
+        .split-row .s-main { font-weight: bold; color: var(--text-primary, #333); }
+        .split-row .s-sub { color: var(--text-secondary, #555); font-weight: 600; }
+        .split-row .col-label { display: none; }
+        .unmatched-empty { color: var(--text-muted, #999); font-size: 0.85rem; font-style: italic; padding: 12px 6px; text-align: center; }
+
+        /* 탭2 상단 2열 그리드 (학생 정보 카드 + 막대 차트) */
+        .tab2-top-row { display: grid; grid-template-columns: 2fr 3fr; gap: 10px; margin: 8px 0 10px; align-items: stretch; }
+        .tab2-info-card { background: #fff; border: 1px solid var(--border-light, #eee); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+        .tab2-info-card .t2-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+        .tab2-info-card .t2-name { font-size: 1.15rem; font-weight: 700; color: var(--text-primary, #333); margin: 0; }
+        .tab2-info-card .t2-meta { font-size: 0.82rem; color: var(--text-muted, #888); margin-top: 3px; }
+        .tab2-info-card .t2-header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .tab2-info-card .info-table { margin-top: 4px; }
+        #tab2 .chart-container { background: #fafafa; border-radius: 12px; padding: 14px 18px; border: 1px solid #eee; display: flex; flex-direction: column; }
+        #tab2 .chart-container .chart-title { font-size: 0.85rem; font-weight: 600; color: var(--primary-dark, #483670); margin-bottom: 6px; }
+        #tab2 .chart-container canvas { max-height: 240px; flex: 1; }
+        #tab2 .narrative-box { margin-top: 0; }
+
+        /* 반응형 — 모바일 / 좁은 화면 */
+        @media (max-width: 820px) {
+            .tab2-top-row { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 720px) {
+            .subj-row { grid-template-columns: 1fr; gap: 4px; padding: 12px 4px; }
+            .subj-row.head { display: none; }
+            .subj-row .col-label { display: inline-block; color: var(--text-muted, #888); font-size: 0.78rem; margin-right: 6px; }
+            .unmatched-grid { grid-template-columns: 1fr; }
+            .split-row { grid-template-columns: 1fr; gap: 3px; }
+            .split-row.head { display: none; }
+            .split-row .col-label { display: inline-block; color: var(--text-muted, #888); font-size: 0.74rem; margin-right: 5px; }
+            .domain-summary { width: 100%; margin-left: 28px; }
+        }
+
+        @media print {
+            body { padding: 0; background: #fff; }
+            .upload-section, .main-header, .controls, .controls-sub, .tabs, #loader, .btn-print-ghost, .no-print { display: none !important; }
+            .tab-content { display: none !important; box-shadow: none; }
+            #counselCard { display: block !important; box-shadow: none; border: none; padding: 0; }
+            .dashboard-container { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="main-header">
+            <div class="main-header-sparkle">✦</div>
+            <h1>내신 성적 통합 분석 대시보드 <span class="header-badge">WEB</span></h1>
+            <p>직전 학기 대비 학생 학업 성장 추이 및 개인별 성적 종합 분석</p>
+        </div>
+
+        <div class="upload-section">
+            <div class="info-box">
+                <h4>자료 업로드 안내</h4>
+                <p>아래 두 파일을 준비하여 각각 업로드해 주세요.</p>
+                <div class="file-guide-grid">
+                    <div class="file-guide-item">
+                        <span class="fg-label">파일 1</span>
+                        <span class="fg-title">직전 시험 전과목 취합 엑셀 (.xlsx)</span>
+                        <span class="fg-example">예) 2025_2학기_2차시험.xlsx</span>
+                    </div>
+                    <div class="file-guide-item">
+                        <span class="fg-label">파일 2</span>
+                        <span class="fg-title">이번 시험 전과목 취합 엑셀 (.xlsx)</span>
+                        <span class="fg-example">예) 2026_1학기_1차시험_전과목_취합완료.xlsx</span>
+                    </div>
+                </div>
+                <p class="fg-note">엑셀 파일에는 <b>학번, 이름, 반, 번호</b>와 과목별 <b>원점수, 석차, 등급, 석차백분율</b>이 포함되어 있어야 합니다.</p>
+            </div>
+
+            <div class="info-box security-box">
+                <h4>보안 안내</h4>
+                <ul>
+                    <li>업로드된 성적 파일은 <b>서버에 전송/저장되지 않습니다.</b></li>
+                    <li>모든 분석은 <b>사용자의 브라우저(로컬)</b>에서만 수행됩니다.</li>
+                    <li>페이지를 닫거나 새로고침하면 메모리에 남은 데이터는 사라집니다.</li>
+                </ul>
+                <p class="security-note">즉, 업로드된 데이터는 외부로 전송되지 않습니다.</p>
+            </div>
+
+            <div class="upload-grid">
+                <div class="upload-slot">
+                    <label class="upload-label">1. 직전 시험 데이터</label>
+                    <div class="upload-drop" id="drop2025" onclick="document.getElementById('file2025').click()">
+                        <div class="upload-drop-icon">📄</div>
+                        <p class="upload-drop-text">엑셀 파일 업로드</p>
+                        <p class="upload-drop-hint">클릭 또는 드래그로 업로드</p>
+                        <input type="file" id="file2025" accept=".xlsx, .xls, .csv" onchange="showFileName(this, 'drop2025')">
+                    </div>
+                </div>
+                <div class="upload-slot">
+                    <label class="upload-label">2. 이번 시험 데이터</label>
+                    <div class="upload-drop" id="drop2026" onclick="document.getElementById('file2026').click()">
+                        <div class="upload-drop-icon">📄</div>
+                        <p class="upload-drop-text">엑셀 파일 업로드</p>
+                        <p class="upload-drop-hint">클릭 또는 드래그로 업로드</p>
+                        <input type="file" id="file2026" accept=".xlsx, .xls, .csv" onchange="showFileName(this, 'drop2026')">
+                    </div>
+                </div>
+            </div>
+
+            <div class="upload-actions">
+                <button class="btn-analyze" onclick="processData()">데이터 연동 및 분석 시작</button>
+                <button class="btn-save-html" onclick="saveFullHTML()" id="btnSaveHtml" disabled>분석결과 HTML 저장</button>
+            </div>
+        </div>
+        
+        <div id="loader" class="loader">데이터를 처리하고 있습니다... 잠시만 기다려주세요.</div>
+
+        <div id="workspace">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab(event,'tab1')">개인별 성적 종합 조회</button>
+                <button class="tab-btn" onclick="switchTab(event,'tab2')">직전 대비 향상/하락 분석</button>
+                <button class="tab-btn" onclick="switchTab(event,'tab3')">과목별 분포 및 통계</button>
+            </div>
+
+            <div class="controls">
+                <div class="ctrl-group">
+                    <span class="ctrl-icon">🏫</span>
+                    <span class="ctrl-label">학급:</span>
+                    <select id="classSelect" onchange="filterStudents()">
+                        <option value="all">전체</option>
+                        <option value="1">1반</option><option value="2">2반</option>
+                        <option value="3">3반</option><option value="4">4반</option>
+                        <option value="5">5반</option><option value="6">6반</option>
+                        <option value="7">7반</option><option value="8">8반</option>
+                        <option value="9">9반</option><option value="10">10반</option>
+                        <option value="11">11반</option>
+                    </select>
+                </div>
+                <div class="ctrl-group ctrl-student">
+                    <span class="ctrl-icon">👤</span>
+                    <span class="ctrl-label">학생:</span>
+                    <div class="search-wrap">
+                        <input type="text" id="studentSearch" placeholder="이름 또는 번호 검색..." autocomplete="off"
+                               oninput="onSearchInput()" onkeydown="onSearchKey(event)" onfocus="onSearchInput()">
+                        <div class="search-results" id="searchResults"></div>
+                    </div>
+                    <select id="studentSelect" onchange="updateDashboard()">
+                        <option value="">학생을 선택하세요</option>
+                    </select>
+                </div>
+                <div class="ctrl-group">
+                    <button class="nav-btn" id="prevBtn" onclick="navStudent(-1)" title="이전 학생">‹</button>
+                    <button class="nav-btn" id="nextBtn" onclick="navStudent(1)" title="다음 학생">›</button>
+                </div>
+                <div class="ctrl-group ctrl-right">
+                    <select id="metricToggle" onchange="updateDashboard()">
+                        <option value="percentile">석차백분율 기준 비교</option>
+                        <option value="score">원점수 기준 비교</option>
+                    </select>
+                    <span class="exam-label" id="examLabel">시험 데이터 미로드</span>
+                </div>
+            </div>
+            <div class="controls-sub">
+                <button class="btn-print-ghost" onclick="printCounselCard()">🖨️ 상담 카드 출력</button>
+            </div>
+
+            <div id="tab1" class="tab-content active">
+                <!-- 학생 헤더 카드 -->
+                <div class="student-header" id="studentHeader">
+                    <div class="sh-left">
+                        <h3 id="shName">학생을 선택해주세요</h3>
+                        <p id="shClass"></p>
+                    </div>
+                    <div class="sh-right">
+                        <div class="sh-stat"><span class="sh-label">평균등급</span><span class="sh-value" id="shAvgGrade">-</span></div>
+                        <div class="sh-stat"><span class="sh-label">전체 인원</span><span class="sh-value" id="shTotal">-</span></div>
+                        <span id="flagBadge1"></span>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="margin-top:18px;">
+                    <!-- 학생 정보 패널 -->
+                    <div class="info-card">
+                        <h4>학생 정보</h4>
+                        <table class="info-table">
+                            <tbody>
+                                <tr><td class="info-key">평균등급</td><td class="info-val" id="infoAvgGrade">-</td></tr>
+                                <tr><td class="info-key">평균 백분위</td><td class="info-val" id="infoAvgPct">-</td></tr>
+                                <tr><td class="info-key">학급 내 등급 순위</td><td class="info-val" id="infoClassRank">-</td></tr>
+                                <tr><td class="info-key">전체 등급 순위</td><td class="info-val" id="infoTotalRank">-</td></tr>
+                                <tr><td class="info-key">응시 과목 수</td><td class="info-val" id="infoSubjCount">-</td></tr>
+                                <tr><td class="info-key">직전 학기 대비</td><td class="info-val" id="infoTrend">-</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- 레이더 차트 -->
+                    <div class="chart-container" style="display:flex; flex-direction:column;">
+                        <h4 style="margin:0 0 4px;">과목별 성취도 (백분위)</h4>
+                        <canvas id="radarChart"></canvas>
+                        <p style="font-size:0.78rem; color:var(--text-muted); text-align:center; margin:6px 0 0;">
+                            응시한 전 과목 · 바깥쪽일수록 상위권</p>
+                    </div>
+                </div>
+
+                <!-- 과목별 상세 분석 (응시 전과목 단일 표) -->
+                <h4 style="margin:22px 0 6px;">과목별 상세 분석 <span id="subjCountLabel" style="color:var(--text-muted); font-weight:normal; font-size:0.9rem;"></span></h4>
+                <table id="reportCardTable">
+                    <thead>
+                        <tr><th>과목</th><th>원점수</th><th>성취도</th><th>석차등급</th><th>석차</th><th>백분위</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div class="achv-legend">
+                    <span><b class="achv-A">A</b> 90점 이상</span>
+                    <span><b class="achv-B">B</b> 80점 이상</span>
+                    <span><b class="achv-C">C</b> 70점 이상</span>
+                    <span><b class="achv-D">D</b> 60점 이상</span>
+                    <span><b class="achv-E">E</b> 60점 미만</span>
+                </div>
+            </div>
+
+            <div id="tab2" class="tab-content">
+
+                <!-- 상단: 학생 정보 카드 + 변화 막대 차트 (좌우 2열) -->
+                <div class="tab2-top-row">
+                    <div class="tab2-info-card">
+                        <div class="t2-header">
+                            <div>
+                                <div class="t2-name" id="t2Name">학생을 선택해주세요</div>
+                                <div class="t2-meta" id="t2Meta"></div>
+                            </div>
+                            <div class="t2-header-right">
+                                <div class="sh-stat"><span class="sh-label">평균등급</span><span class="sh-value" id="t2AvgGrade">-</span></div>
+                                <span id="t2FlagBadge"></span>
+                            </div>
+                        </div>
+                        <table class="info-table">
+                            <tbody>
+                                <tr><td class="info-key">평균등급</td><td class="info-val" id="t2InfoAvgGrade">-</td></tr>
+                                <tr><td class="info-key">평균 백분위</td><td class="info-val" id="t2InfoAvgPct">-</td></tr>
+                                <tr><td class="info-key">학급 내 등급 순위</td><td class="info-val" id="t2InfoClassRank">-</td></tr>
+                                <tr><td class="info-key">전체 등급 순위</td><td class="info-val" id="t2InfoTotalRank">-</td></tr>
+                                <tr><td class="info-key">응시 과목 수</td><td class="info-val" id="t2InfoSubjCount">-</td></tr>
+                                <tr><td class="info-key">직전 학기 대비</td><td class="info-val" id="t2InfoTrend">-</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title">교과군별 변화 추이</div>
+                        <canvas id="barChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 종합 분석 한 줄 띠 -->
+                <div class="narrative-box" id="narrativeBox">데이터 분석을 위해 학생을 선택해주세요.</div>
+
+                <!-- 교과군 아코디언 (군별 → 과목별 펼침) -->
+                <div id="domainAccordion" class="domain-accordion"></div>
+            </div>
+
+            <div id="tab3" class="tab-content">
+
+                <!-- 분포 위치 (전체 응시 인원 기준, 보완1 반투명 점) -->
+                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;">
+                    <span style="font-weight:bold; font-size:1rem;">분포 위치</span>
+                    <span id="distSubtitle" style="font-size:0.85rem; color:var(--text-muted);">전체 응시 인원 기준</span>
+                </div>
+                <div class="dist-legend">
+                    <span>● <span style="color:var(--primary);font-weight:bold;">선택 학생</span></span>
+                    <span>● <span style="color:#185FA5;">다른 학생 (겹칠수록 진하게)</span></span>
+                    <span>┃ <span style="color:#185FA5;">전체 평균</span></span>
+                </div>
+                <div id="distContainer"></div>
+
+                <!-- 과목별 등급 컷 통계 표 (막대그래프 제거) -->
+                <h4 style="margin:26px 0 8px;">과목별 등급 컷 통계
+                    <span id="statsExamLabel" style="font-size:0.85rem; color:var(--text-muted); font-weight:normal;"></span>
+                </h4>
+                <table id="statsTable">
+                    <thead>
+                        <tr>
+                            <th>과목명</th>
+                            <th>전체 평균점수</th>
+                            <th>응시 인원</th>
+                            <th style="color:#15803D;">1등급<br><small>(10%)</small> 컷</th>
+                            <th style="color:#2563EB;">2등급<br><small>(34%)</small> 컷</th>
+                            <th style="color:#D97706;">3등급<br><small>(66%)</small> 컷</th>
+                            <th style="color:#9333EA;">4등급<br><small>(90%)</small> 컷</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- 출력 전용 상담 카드 -->
+            <div id="counselCard" class="tab-content">
+                <!-- 헤더: 제목 + 시험 정보 + 플래그 -->
+                <div id="ccHeader" style="display:flex; justify-content:space-between; align-items:center; gap:12px; padding-bottom:10px; border-bottom:1px solid #e0e0e0; flex-wrap:wrap; margin-bottom:12px;">
+                    <div>
+                        <h2 id="ccTitle" style="color: var(--primary); margin:0; font-size:1.3rem;"></h2>
+                        <p id="ccSubtitle" style="color:#666; margin:3px 0 0; font-size:0.85rem;"></p>
+                    </div>
+                    <span id="ccFlag"></span>
+                </div>
+
+                <!-- 1. 개인별 성적 종합 (탭1과 동일 구조) -->
+                <h4 class="cc-section-title">1. 개인별 성적 종합</h4>
+
+                <!-- 학생 정보 + 레이더 차트 (2열) -->
+                <div class="grid-2" style="margin-top:12px;">
+                    <div class="info-card">
+                        <h4 style="margin:0 0 8px;">학생 정보</h4>
+                        <table class="info-table">
+                            <tbody id="ccInfoBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="chart-container" style="display:flex; flex-direction:column;">
+                        <h4 style="margin:0 0 4px;">과목별 성취도 (백분위)</h4>
+                        <img id="ccRadarImg" src="" alt="과목별 성취도 레이더 차트" style="width:240px; height:240px; display:block; margin:0 auto; object-fit:contain;">
+                        <p style="font-size:0.75rem; color:var(--text-muted); text-align:center; margin:4px 0 0;">응시한 전 과목 · 바깥쪽일수록 상위권</p>
+                    </div>
+                </div>
+
+                <!-- 과목별 상세 분석 표 -->
+                <h4 style="margin:16px 0 6px; font-size:1rem;"><b>과목별 상세 분석</b> <span id="ccSubjCountLabel" style="color:var(--text-muted); font-weight:normal; font-size:0.85rem;"></span></h4>
+                <table id="ccSubjectTable" class="cc-table">
+                    <thead>
+                        <tr><th>과목</th><th>원점수</th><th>성취도</th><th>석차등급</th><th>석차</th><th>백분위</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+                <div class="achv-legend" style="margin-bottom:8px;">
+                    <span><b class="achv-A">A</b> 90점 이상</span>
+                    <span><b class="achv-B">B</b> 80점 이상</span>
+                    <span><b class="achv-C">C</b> 70점 이상</span>
+                    <span><b class="achv-D">D</b> 60점 이상</span>
+                    <span><b class="achv-E">E</b> 60점 미만</span>
+                </div>
+
+                <!-- 2. 교과별 직전 대비 성장 추이 — 2페이지 시작 -->
+                <div style="page-break-before: always;">
+                <h4 class="cc-section-title">2. 교과별 직전 대비 성장 추이</h4>
+                    <table id="ccGrowthTable" class="cc-table cc-growth-table">
+                        <thead>
+                            <tr class="cc-grow-h1">
+                                <th rowspan="2">과목</th>
+                                <th colspan="4" class="cc-prev-bg">직전 시험</th>
+                                <th colspan="4">이번 시험</th>
+                                <th colspan="4" class="cc-delta-bg">변화</th>
+                            </tr>
+                            <tr class="cc-grow-h2">
+                                <th class="cc-prev-bg">점수</th><th class="cc-prev-bg">석차</th><th class="cc-prev-bg">등급</th><th class="cc-prev-bg">백분위</th>
+                                <th>점수</th><th>석차</th><th>등급</th><th>백분위</th>
+                                <th class="cc-delta-bg">점수</th><th class="cc-delta-bg">석차</th><th class="cc-delta-bg">등급</th><th class="cc-delta-bg">백분위</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+
+                <!-- 3. 과목별 분포 위치 -->
+                <h4 class="cc-section-title">3. 과목별 분포 위치 (전체 응시 인원 기준)</h4>
+                <div id="ccDistContainer"></div>
+
+                <!-- 상담 내용 기록 -->
+                <div style="margin-top:14px; border-top:1px solid #e0e0e0; padding-top:10px;">
+                    <h4 style="margin:0 0 6px; font-size:0.9rem;">상담 내용 기록</h4>
+                    <div class="memo-area" style="min-height:100px;"></div>
+                </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
