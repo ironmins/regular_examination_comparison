@@ -11,6 +11,20 @@ let subjects2025 = [];
 let charts = {};
 let currentOptionList = [];
 
+/* 시험 라벨 — 업로드 파일명에서 추출 (예: '2026 1학기 2차') */
+var examLabelPrev = '직전 시험';
+var examLabelCurr = '이번 시험';
+
+function shortExamLabel(fileName, fallback) {
+    if(!fileName) return fallback;
+    let base = fileName.replace(/\.(xlsx|xls|csv)$/i, '').replace(/_/g, ' ').trim();
+    let m = base.match(/(\d{4})\D*?([12])\s*학기\D*?(\d)\s*차/);
+    if(m) return `${m[1]} ${m[2]}학기 ${m[3]}차`;
+    let m2 = base.match(/(\d{4})\D*?([12])\s*학기/);
+    if(m2) return `${m2[1]} ${m2[2]}학기`;
+    return base || fallback;
+}
+
 /* 교과군 분류 매핑 — 과목명 → 교과군 */
 const SUBJ_TO_GROUP = {
     /* 국어군 */
@@ -249,9 +263,12 @@ async function processData() {
     const f2026 = document.getElementById('file2026').files[0];
 
     if(!f2025 || !f2026) {
-        alert("2025학년도 파일과 2026학년도 파일을 모두 업로드해주세요.");
+        alert("직전 시험 파일과 이번 시험 파일을 모두 업로드해주세요.");
         return;
     }
+
+    examLabelPrev = shortExamLabel(f2025.name, '직전 시험');
+    examLabelCurr = shortExamLabel(f2026.name, '이번 시험');
 
     document.getElementById('loader').style.display = 'block';
 
@@ -263,7 +280,7 @@ async function processData() {
         db2026 = buildDB(data26);
 
         if(Object.keys(db2026).length === 0) {
-            alert("2026학년도 데이터에서 학생 정보를 찾지 못했습니다.");
+            alert("이번 시험 데이터에서 학생 정보를 찾지 못했습니다.");
         }
 
         buildDomains();
@@ -823,7 +840,7 @@ function renderTab2(s25, s26) {
     fillTab2InfoCard(s25, s26);
 
     if(!s25) {
-        narrativeBox.innerHTML = "해당 학생의 2025학년도(직전 학기) 데이터를 찾을 수 없어 향상도 분석이 불가합니다. (동명이인이 아닌 전학생일 가능성)";
+        narrativeBox.innerHTML = "해당 학생의 직전 시험(" + examLabelPrev + ") 데이터를 찾을 수 없어 향상도 분석이 불가합니다. (동명이인이 아닌 전학생일 가능성)";
         if(charts.bar) charts.bar.destroy();
         return;
     }
@@ -1101,7 +1118,15 @@ function renderSubjectRow(prevSubj, prevSc, currSubj, currSc) {
 /* 신뢰 불가 교과군 (사·과) — 좌우 분리 패널, 각 패널은 4열 미니 표
    왼쪽: 직전 통합과목들 / 오른쪽: 이번 학기 선택과목들 (직전·이번 비교는 1:1 불가하므로 화살표 없음) */
 function buildUnreliableBody(s25, s26, d) {
-    // 좌측 (2025 직전 통합과목)
+    // 과목 유형(통합/선택) 판별 — 공통·통합 과목이면 '통합과목', 아니면 '선택과목'
+    const isCommon = s => /^(공통|통합)/.test(s);
+    const prevType = d.prev.length && d.prev.every(isCommon) ? '통합과목' : '선택과목';
+    const currType = d.curr.length && d.curr.every(isCommon) ? '통합과목' : '선택과목';
+    const noteText = (prevType === '통합과목' && currType === '선택과목')
+        ? '직전 통합과목 → 이번 시험 선택과목으로 분리되어'
+        : '직전·이번 시험의 응시 과목 구성이 달라 1:1 비교가 어려우므로';
+
+    // 좌측 (직전 시험)
     let leftRows = '';
     d.prev.forEach(prevSubj => {
         let key = matchSubject(s25.scores, prevSubj);
@@ -1118,10 +1143,10 @@ function buildUnreliableBody(s25, s26, d) {
             ${leftRows}
         `;
     } else {
-        leftBody = '<div class="unmatched-empty">직전 학기 응시 과목 없음</div>';
+        leftBody = '<div class="unmatched-empty">직전 시험 응시 과목 없음</div>';
     }
 
-    // 우측 (2026 이번 선택과목)
+    // 우측 (이번 시험)
     let rightRows = '';
     d.curr.forEach(currSubj => {
         let key = matchSubject(s26.scores, currSubj);
@@ -1138,21 +1163,21 @@ function buildUnreliableBody(s25, s26, d) {
             ${rightRows}
         `;
     } else {
-        rightBody = '<div class="unmatched-empty">이번 학기 응시 과목 없음</div>';
+        rightBody = '<div class="unmatched-empty">이번 시험 응시 과목 없음</div>';
     }
 
     return `
         <div class="unmatched-note">
-            직전 통합과목 → 이번 학기 선택과목으로 분리되어, 좌(2025 직전)·우(2026 이번) 패널로 나누어 표시합니다.
-            응시 집단(전체 vs 선택자)도 다르므로 <b>참고용으로만</b> 해석하세요.
+            ${noteText}, 좌(${examLabelPrev})·우(${examLabelCurr}) 패널로 나누어 표시합니다.
+            응시 집단도 다르므로 <b>참고용으로만</b> 해석하세요.
         </div>
         <div class="unmatched-grid">
             <div class="unmatched-col">
-                <h5>📘 2025 직전 (통합과목)</h5>
+                <h5>📘 ${examLabelPrev} (${prevType})</h5>
                 ${leftBody}
             </div>
             <div class="unmatched-col">
-                <h5>📗 2026 이번 (선택과목)</h5>
+                <h5>📗 ${examLabelCurr} (${currType})</h5>
                 ${rightBody}
             </div>
         </div>
@@ -2039,7 +2064,9 @@ function saveFullHTML() {
     let dbJSON = 'var db2025=' + JSON.stringify(db2025) + ';\n'
         + 'var db2026=' + JSON.stringify(db2026) + ';\n'
         + 'var subjects2025=' + JSON.stringify(subjects2025) + ';\n'
-        + 'var subjects2026=' + JSON.stringify(subjects2026) + ';\n';
+        + 'var subjects2026=' + JSON.stringify(subjects2026) + ';\n'
+        + 'var examLabelPrev=' + JSON.stringify(examLabelPrev) + ';\n'
+        + 'var examLabelCurr=' + JSON.stringify(examLabelCurr) + ';\n';
 
     // 8) app.js 전체 함수를 문자열로 수집 (현재 정의된 모든 함수)
     let fnNames = [
